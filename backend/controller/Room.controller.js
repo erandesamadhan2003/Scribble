@@ -4,7 +4,7 @@ import User from '../models/User.js';
 export const createRoom = async (req, res) => {
     try {
         const { hostId, roomCode } = req.body;
-
+        
         if (!hostId || !roomCode) {
             return res.status(400).json({
                 success: false,

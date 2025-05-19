@@ -1,4 +1,11 @@
 export const HowToPlay = () => {
+  const instruction = [
+    `Choose a word from the provided options or get a random one`,
+    `Draw your word within the time limit using the drawing tools`,
+  `Other players try to guess what you've drawn in the chat`,
+    `Earn points for correct guesses and accurate drawings`
+  ]
+  
   return (
     <div className="flex flex-col h-full p-6 m-4 bg-white rounded-lg shadow-lg bg-opacity-60 w-96">
       <div className="flex items-center mb-4">
@@ -9,27 +16,13 @@ export const HowToPlay = () => {
       </div>
 
       <div className="flex-grow text-gray-700">
-        <div className="flex items-start mb-3">
-          <div className="flex items-center justify-center flex-shrink-0 w-6 h-6 mr-2 rounded-full bg-emerald-100 text-emerald-800">1</div>
-          <p>Choose a word from the provided options or get a random one</p>
-        </div>
-        
-        <div className="flex items-start mb-3">
-          <div className="flex items-center justify-center flex-shrink-0 w-6 h-6 mr-2 rounded-full bg-emerald-100 text-emerald-800">2</div>
-          <p>Draw your word within the time limit using the drawing tools</p>
-        </div>
-        
-        <div className="flex items-start mb-3">
-          <div className="flex items-center justify-center flex-shrink-0 w-6 h-6 mr-2 rounded-full bg-emerald-100 text-emerald-800">3</div>
-          <p>Other players try to guess what you've drawn in the chat</p>
-        </div>
-        
-        <div className="flex items-start mb-3">
-          <div className="flex items-center justify-center flex-shrink-0 w-6 h-6 mr-2 rounded-full bg-emerald-100 text-emerald-800">4</div>
-          <p>Earn points for correct guesses and accurate drawings</p>
-        </div>
+        {instruction.map((elem, index) => (
+          <div className="flex items-start mb-3" key={index}>
+            <div className="flex items-center justify-center flex-shrink-0 w-6 h-6 mr-2 rounded-full bg-emerald-100 text-emerald-800">{index + 1}</div>
+            <p>{elem}</p>
+          </div>
+        ))}
       </div>
-
       <div className="pt-4 mt-auto border-t border-gray-200">
         <p className="text-sm italic text-center text-emerald-600">
           No artistic skills required—just creativity and fun!

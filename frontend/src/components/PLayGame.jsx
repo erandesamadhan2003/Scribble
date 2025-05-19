@@ -1,11 +1,94 @@
 import { useState, useEffect } from "react";
+import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "./ui/dialog";
+import { toast } from "@/hooks/use-toast";
+import { useNavigate } from "react-router-dom";
 
 export const PlayGame = () => {
-    const [hover, setHover] = useState(false);
-    const [joinHover, setJoinHover] = useState(false);
-    const [createHover, setCreateHover] = useState(false);
     const [playerName, setPlayerName] = useState("");
     const [avatarSeed, setAvatarSeed] = useState("player");
+    const [roomCode, setRoomCode] = useState("");
+    const navigate = useNavigate();
+    const [user, setUser] = useState();
+
+
+    const createUser = async (host) => {
+        try {
+            const response = await fetch("http://localhost:3000/api/player/create", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    username: playerName,
+                    isHost: host,
+                    avatar: `https://api.dicebear.com/6.x/bottts/svg?seed=${avatarSeed}`
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                setUser(data.user);
+                localStorage.setItem("user", JSON.stringify(data.user));
+                toast({ description: data.message });
+                return data.user; 
+            }
+        } catch (error) {
+            console.log(error);
+            toast({ description: "Failed to create user." });
+            return null;
+        }
+    };
+
+
+    const handleCreateRoom = async () => {
+        const createdUser = await createUser(true); 
+        if (!createdUser) return;
+
+        try {
+            const response = await fetch("http://localhost:3000/api/room/create", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    hostId: createdUser._id, 
+                    roomCode
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                localStorage.setItem("room", JSON.stringify(data.room));
+                navigate(`/sketchNsnort/${data.room.roomCode}`);
+            }
+        } catch (error) {
+            console.log(error);
+            toast({ description: "Failed to create room." });
+        }
+    };
+
+
+    const handleJoinRoom = async () => {
+        const createdUser = await createUser(false);
+
+        try {
+            const response = await fetch(`http://localhost:3000/api/room/join/${roomCode}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ userId: createdUser._id })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                localStorage.setItem("room", JSON.stringify(data.room));
+                toast({ description: data.message });
+                navigate(`/sketchNsnort/${data.room.roomCode}`);
+            }
+        } catch (error) {
+            console.log(error);
+            toast({ description: "Failed to join room." });
+        }
+    };
+
 
     useEffect(() => {
         setAvatarSeed(playerName ? playerName : "player");
@@ -48,43 +131,74 @@ export const PlayGame = () => {
                     />
                 </div>
 
-                {/* Game Buttons */}
-                <div className="flex w-full mb-4 space-x-4">
-                    <button
-                        className={`flex-1 px-4 py-3 rounded-lg font-bold transition-all duration-300 ${joinHover
-                                ? "bg-emerald-700 text-white shadow-lg transform scale-105"
-                                : "bg-emerald-500 text-white shadow-md"
-                            }`}
-                        onMouseEnter={() => setJoinHover(true)}
-                        onMouseLeave={() => setJoinHover(false)}
-                    >
-                        JOIN ROOM
-                    </button>
+                <div className="flex justify-around w-full mb-4 space-x-4">
+                    <Dialog>
+                        <DialogTrigger asChild>
+                            <button variant="outline"
+                                className={`flex-1 px-4 py-3 rounded-lg font-bold transition-all duration-300 
+                            hover:bg-emerald-700 hover:text-white hover:shadow-lg hover:transform hover:scale-105
+                            bg-emerald-500 text-white shadow-md
+                            `}
+                            >
+                                JOIN ROOM
+                            </button>
+                        </DialogTrigger>
+                        <DialogContent>
+                            <DialogTitle>
+                                Enter RoomCode
+                            </DialogTitle>
+                            <input type="text" value={roomCode} onChange={(e) => setRoomCode(e.target.value)} placeholder="Enter Room Code"
+                                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                            />
+                            <button
+                                onClick={handleJoinRoom}
+                                className={`py-2 rounded-lg font-bold transition-all duration-300 
+                                hover:bg-emerald-700 hover:text-white hover:shadow-lg hover:transform hover:scale-105
+                                bg-emerald-500 text-white shadow-md
+                            `}>JOIN Room</button>
+                        </DialogContent>
+                    </Dialog>
 
-                    <button
-                        className={`flex-1 px-4 py-3 rounded-lg font-bold transition-all duration-300 ${createHover
-                                ? "bg-blue-700 text-white shadow-lg transform scale-105"
-                                : "bg-blue-500 text-white shadow-md"
-                            }`}
-                        onMouseEnter={() => setCreateHover(true)}
-                        onMouseLeave={() => setCreateHover(false)}
-                    >
-                        CREATE ROOM
-                    </button>
+                    <Dialog>
+                        <DialogTrigger asChild>
+                            <button variant="outline"
+                                className={`flex-1 px-4 py-3 rounded-lg font-bold transition-all duration-300
+                                hover:bg-blue-700 hover:text-white hover:shadow-lg hover:transform hover:scale-105
+                                bg-blue-500 text-white shadow-md
+                            `}
+                            >
+                                CREATE ROOM
+                            </button>
+                        </DialogTrigger>
+                        <DialogContent>
+                            <DialogTitle>
+                                Enter RoomCode
+                            </DialogTitle>
+                            <input type="text" value={roomCode} onChange={(e) => setRoomCode(e.target.value)} placeholder="Enter Room Code"
+                                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                            />
+                            <button
+                                className={`py-2 rounded-lg font-bold transition-all duration-300 
+                                    hover:bg-emerald-700 hover:text-white hover:shadow-lg hover:transform hover:scale-105
+                                    bg-emerald-500 text-white shadow-md`}
+                                onClick={handleCreateRoom}
+                            >Create Room</button>
+                        </DialogContent>
+                    </Dialog>
+
+
                 </div>
 
-                <div className="w-full mt-4">
+                {/* <div className="w-full mt-4">
                     <button
-                        className={`w-full px-8 py-3 rounded-full font-bold transition-all duration-300 ${hover
-                                ? "bg-purple-700 text-white shadow-lg transform scale-105"
-                                : "bg-purple-500 text-white shadow-md"
-                            }`}
-                        onMouseEnter={() => setHover(true)}
-                        onMouseLeave={() => setHover(false)}
+                        className={`w-full px-8 py-3 rounded-full font-bold transition-all duration-300 
+                                hover:bg-purple-700 hover:text-white hover:shadow-lg hover:transform hover:scale-105
+                                bg-purple-500 text-white shadow-md
+                            `}
                     >
                         START PLAYING NOW
                     </button>
-                </div>
+                </div> */}
             </div>
         </div>
     );

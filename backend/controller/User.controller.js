@@ -4,7 +4,7 @@ import User from "../models/User.js";
 export const createUser = async (req, res) => {
     try {
         const { username, isHost, avatar } = req.body;
-        if (!username || !isHost || !avatar) {
+        if (!username || !avatar) {
             return res.status(400).json({
                 success: false,
                 message: 'All Fields are required'

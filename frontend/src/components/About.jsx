@@ -7,21 +7,23 @@ export const About = () => {
         </svg>
         <h2 className="text-2xl font-bold text-indigo-600">About SketchNSnort</h2>
       </div>
-      
+
       <div className="flex-grow text-gray-700">
         <p className="mb-3">
           SketchNSnort is a fun drawing and guessing game where players take turns creating art and guessing what others have drawn.
         </p>
-        
+
         <p className="mb-3">
           With easy-to-use drawing tools and a friendly interface, anyone can join the fun regardless of artistic ability!
         </p>
-        
+
         <p className="mb-3">
           Created with passion for bringing people together through creative gameplay.
         </p>
       </div>
-      
+
     </div>
   );
 };
+
+
