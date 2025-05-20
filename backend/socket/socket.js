@@ -55,6 +55,7 @@ export const initSocket = (server) => {
 
         socket.on("stopDrawing", (data) => {
             const { roomCode } = data;
+            // No need to do anything here as the line is already saved
         });
 
         socket.on("undo", (updatedLines, roomCode) => { 

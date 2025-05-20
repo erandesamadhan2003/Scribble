@@ -212,7 +212,12 @@ export const Drawkit = ({ width }) => {
             lastLine.points = [...lastLine.points, pos.x, pos.y];
             const updatedLines = [...lines.slice(0, -1), lastLine];
             setLines(updatedLines);
-            socketRef.current.emit("drawing", { ...lastLine, roomCode, isDrawing: true, newPoints });
+            socketRef.current.emit("drawing", { 
+                ...lastLine, 
+                roomCode, 
+                isDrawing: true, 
+                newPoints: lastLine.points 
+            });
         };
 
         const handleTouchEnd = () => {
