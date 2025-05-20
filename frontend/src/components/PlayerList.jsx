@@ -1,14 +1,26 @@
 import React, { useEffect, useState } from "react";
+import { useParams } from "react-router-dom";
 
 export const PlayerList = ({ width }) => {
     const [room, setRoom] = useState(null);
+    const { roomCode } = useParams();
 
     useEffect(() => {
-        const roomData = localStorage.getItem("room");
-        if (roomData) {
-            setRoom(JSON.parse(roomData));
+        console.log("RoomCode",roomCode)
+        const fetchroomDetails = async () => {
+            try {
+                const response = await fetch(`http://localhost:3000/api/room/getRoom/${roomCode}`);
+
+                const data = await response.json();
+                setRoom(data.room);
+            } catch (error) {
+                console.log(error);
+                toast({description:'Failed to fetch room details'});
+            }
         }
-    }, []);
+
+        fetchroomDetails();
+    }, [roomCode]);
 
     if (!room) {
         return (

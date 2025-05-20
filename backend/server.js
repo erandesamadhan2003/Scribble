@@ -5,6 +5,7 @@ import { connectToDatabase } from './config/db.js';
 import { playerRoutes } from './routes/user.routes.js';
 import roomRoutes from './routes/room.routes.js';
 import cors from 'cors';
+import { initSocket } from './socket/socket.js';
 dotenv.config();
 
 const app = express();
@@ -21,6 +22,8 @@ app.use(cors(corsOption));
 app.use(express.json());
 app.use('/api/player', playerRoutes);
 app.use('/api/room', roomRoutes);
+
+initSocket(server);
 
 const PORT = process.env.PORT;
 server.listen(PORT, () => {

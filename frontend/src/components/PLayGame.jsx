@@ -8,8 +8,7 @@ export const PlayGame = () => {
     const [avatarSeed, setAvatarSeed] = useState("player");
     const [roomCode, setRoomCode] = useState("");
     const navigate = useNavigate();
-    const [user, setUser] = useState();
-
+    // const [user, setUser] = useState();
 
     const createUser = async (host) => {
         try {
@@ -26,7 +25,7 @@ export const PlayGame = () => {
             const data = await response.json();
 
             if (data.success) {
-                setUser(data.user);
+                // setUser(data.user);
                 localStorage.setItem("user", JSON.stringify(data.user));
                 toast({ description: data.message });
                 return data.user; 
@@ -56,7 +55,6 @@ export const PlayGame = () => {
             const data = await response.json();
 
             if (data.success) {
-                localStorage.setItem("room", JSON.stringify(data.room));
                 navigate(`/sketchNsnort/${data.room.roomCode}`);
             }
         } catch (error) {
@@ -79,7 +77,6 @@ export const PlayGame = () => {
             const data = await response.json();
 
             if (data.success) {
-                localStorage.setItem("room", JSON.stringify(data.room));
                 toast({ description: data.message });
                 navigate(`/sketchNsnort/${data.room.roomCode}`);
             }

@@ -1,7 +1,11 @@
 import React, { useRef, useState, useEffect } from "react";
 import { Stage, Layer, Line } from "react-konva";
 import { Palette, Eraser, Undo2, Redo2, Trash2 } from "lucide-react";
+import { useParams } from "react-router-dom";
+import { toast } from "@/hooks/use-toast";
+import { io } from "socket.io-client";
 
+const SOCKET_URL = "http://localhost:3000";
 export const Drawkit = ({ width }) => {
     const [lines, setLines] = useState([]);
     const [tool, setTool] = useState("pen");
@@ -11,10 +15,15 @@ export const Drawkit = ({ width }) => {
     const [redoStack, setRedoStack] = useState([]);
     const isDrawing = useRef(false);
     const stageRef = useRef(null);
-
+    const socketRef = useRef(null);
+    const [room, setRoom] = useState(null);
+    const { roomCode } = useParams();
     const containerRef = useRef(null);
-
     const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
+    const colors = ["#3b82f6", "#ef4444", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899", "#000000", "#6b7280"];
+    const strokeWidths = [1, 3, 5, 8, 12, 14, 18, 24, 28];
+
+
 
     const handleResize = () => {
         if (containerRef.current) {
@@ -24,6 +33,22 @@ export const Drawkit = ({ width }) => {
             });
         }
     };
+    //get room details
+    useEffect(() => {
+        const fetchroomDetails = async () => {
+            try {
+                const response = await fetch(`http://localhost:3000/api/room/getRoom/${roomCode}`);
+
+                const data = await response.json();
+                setRoom(data.room);
+            } catch (error) {
+                console.log(error);
+                toast({ description: 'Failed to fetch room details' });
+            }
+        }
+
+        fetchroomDetails();
+    }, [roomCode]);
 
     useEffect(() => {
         handleResize();
@@ -31,9 +56,50 @@ export const Drawkit = ({ width }) => {
         return () => window.removeEventListener("resize", handleResize);
     }, []);
 
-    const colors = ["#3b82f6", "#ef4444", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899", "#000000", "#6b7280"];
 
-    const strokeWidths = [1, 3, 5, 8, 12, 14, 18, 24, 28];
+    useEffect(() => {
+        socketRef.current = io(SOCKET_URL);
+        socketRef.current.emit("joinRoom", roomCode);
+        socketRef.current.on("drawing", (data) => {
+            setLines((prevLines) => [...prevLines, data]);
+        });
+
+        socketRef.current.on("undo", (updatedLines) => {
+            setLines(updatedLines);
+            setHistory((prevHistory) => {
+                const lastStateIndex = prevHistory.findIndex(historyState => JSON.stringify(historyState) === JSON.stringify(updatedLines));
+                if (lastStateIndex !== -1) {
+                    return prevHistory.slice(0, lastStateIndex);
+                }
+                return prevHistory;
+            });
+            setRedoStack((prevRedoStack) => [JSON.parse(JSON.stringify(prevLines.current)), ...prevRedoStack]);
+        });
+
+        socketRef.current.on("redo", (updatedLines) => {
+            setLines(updatedLines);
+            setHistory((prevHistory) => [...prevHistory, JSON.parse(JSON.stringify(prevLines.current))]);
+            setRedoStack((prevRedoStack) => prevRedoStack.slice(1));
+        });
+
+        socketRef.current.on("clear", () => {
+            setLines([]);
+            setHistory([]);
+            setRedoStack([]);
+        });
+        return () => {
+            socketRef.current.off("drawing");
+            socketRef.current.off("undo");
+            socketRef.current.off("redo");
+            socketRef.current.off("clear");
+            socketRef.current.disconnect();
+        };
+    }, [roomCode]);
+
+    const prevLines = useRef(lines);
+    useEffect(() => {
+        prevLines.current = lines;
+    }, [lines]);
 
     const handleMouseDown = (e) => {
         isDrawing.current = true;
@@ -45,6 +111,7 @@ export const Drawkit = ({ width }) => {
             points: [pos.x, pos.y],
         };
         setLines([...lines, newLine]);
+        socketRef.current.emit("startDrawing", { ...newLine, roomCode });
         setRedoStack([]);
     };
 
@@ -56,12 +123,15 @@ export const Drawkit = ({ width }) => {
         lastLine.points = [...lastLine.points, point.x, point.y];
         const updatedLines = [...lines.slice(0, -1), lastLine];
         setLines(updatedLines);
+        socketRef.current.emit("drawing", { ...lastLine, roomCode, isDrawing: true, newPoints });
+
     };
 
     const handleMouseUp = () => {
         isDrawing.current = false;
         if (lines.length > 0 && lines[lines.length - 1].points.length > 2) {
             setHistory([...history, JSON.parse(JSON.stringify(lines))]);
+            socketRef.current.emit("stopDrawing", { roomCode });
         }
     };
 
@@ -72,23 +142,24 @@ export const Drawkit = ({ width }) => {
 
         if (history.length === 0) {
             setLines([]);
+            socketRef.current.emit("undo", [], roomCode);
             return;
         }
 
         const previousState = history[history.length - 1];
         setLines(previousState);
         setHistory(history.slice(0, -1));
+        socketRef.current.emit("undo", previousState, roomCode);
     };
 
     const handleRedo = () => {
         if (redoStack.length === 0) return;
 
         const redoState = redoStack[redoStack.length - 1];
-
         setHistory([...history, JSON.parse(JSON.stringify(lines))]);
-
         setLines(redoState);
         setRedoStack(redoStack.slice(0, -1));
+        socketRef.current.emit("redo", redoState, roomCode);
     };
 
     const handleClear = () => {
@@ -96,7 +167,9 @@ export const Drawkit = ({ width }) => {
         setHistory([...history, JSON.parse(JSON.stringify(lines))]);
         setLines([]);
         setRedoStack([]);
+        socketRef.current.emit("clear", roomCode);
     };
+
 
     useEffect(() => {
         const handleTouchStart = (e) => {
@@ -115,6 +188,7 @@ export const Drawkit = ({ width }) => {
                 points: [pos.x, pos.y],
             };
             setLines([...lines, newLine]);
+            socketRef.current.emit("startDrawing", { ...newLine, roomCode });
             setRedoStack([]);
         };
 
@@ -129,12 +203,14 @@ export const Drawkit = ({ width }) => {
             lastLine.points = [...lastLine.points, pos.x, pos.y];
             const updatedLines = [...lines.slice(0, -1), lastLine];
             setLines(updatedLines);
+            socketRef.current.emit("drawing", { ...lastLine, roomCode, isDrawing: true, newPoints });
         };
 
         const handleTouchEnd = () => {
             isDrawing.current = false;
             if (lines.length > 0 && lines[lines.length - 1].points.length > 2) {
                 setHistory([...history, JSON.parse(JSON.stringify(lines))]);
+                socketRef.current.emit("stopDrawing", { roomCode });
             }
         };
 
@@ -151,7 +227,7 @@ export const Drawkit = ({ width }) => {
                 konvaContainer.removeEventListener('touchend', handleTouchEnd);
             };
         }
-    }, [tool, color, strokeWidth, lines, history]);
+    }, [tool, color, strokeWidth, lines, history, roomCode]);
 
     return (
         <div className="flex flex-col items-center p-4 rounded-lg shadow-md bg-gray-50" style={{ width: `${width}%` }}>
@@ -278,4 +354,5 @@ export const Drawkit = ({ width }) => {
             </div>
         </div>
     );
-};
+}
+

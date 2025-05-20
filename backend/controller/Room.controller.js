@@ -47,7 +47,7 @@ export const createRoom = async (req, res) => {
 export const getRoomByCode = async (req, res) => {
     try {
         const { roomCode } = req.params;
-
+        
         if (!roomCode) {
             return res.status(400).json({
                 success: false,

@@ -10,7 +10,7 @@ const appRouter = createBrowserRouter([
     element: <Home />
   },
   {
-    path: '/sketchNsnort/:id',
+    path: '/sketchNsnort/:roomCode',
     element: <GamePlay />
   }
 ])
