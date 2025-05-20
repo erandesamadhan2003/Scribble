@@ -60,6 +60,11 @@ export const Drawkit = ({ width }) => {
     useEffect(() => {
         socketRef.current = io(SOCKET_URL);
         socketRef.current.emit("joinRoom", roomCode);
+        
+        socketRef.current.on("syncDrawing", (initialLines) => {
+            setLines(initialLines);
+        });
+
         socketRef.current.on("drawing", (data) => {
             setLines((prevLines) => [...prevLines, data]);
         });
@@ -123,8 +128,12 @@ export const Drawkit = ({ width }) => {
         lastLine.points = [...lastLine.points, point.x, point.y];
         const updatedLines = [...lines.slice(0, -1), lastLine];
         setLines(updatedLines);
-        socketRef.current.emit("drawing", { ...lastLine, roomCode, isDrawing: true, newPoints });
-
+        socketRef.current.emit("drawing", { 
+            ...lastLine, 
+            roomCode, 
+            isDrawing: true, 
+            newPoints: lastLine.points 
+        });
     };
 
     const handleMouseUp = () => {

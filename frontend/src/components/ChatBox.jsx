@@ -1,9 +1,16 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
+import { io } from "socket.io-client";
+import { useParams } from "react-router-dom";
+
+const SOCKET_URL = "http://localhost:3000";
 
 export const ChatBox = ({ width }) => {
     const [messages, setMessages] = useState([]);
     const [input, setInput] = useState("");
     const [user, setUser] = useState(null);
+    const socketRef = useRef(null);
+    const { roomCode } = useParams();
+    const messagesEndRef = useRef(null);
 
     useEffect(() => {
         const userData = localStorage.getItem("user");
@@ -11,6 +18,25 @@ export const ChatBox = ({ width }) => {
             setUser(JSON.parse(userData));
         }
     }, []);
+
+    useEffect(() => {
+        socketRef.current = io(SOCKET_URL);
+        socketRef.current.emit("joinRoom", roomCode);
+
+        socketRef.current.on("chatMessage", (message) => {
+            setMessages((prev) => [...prev, message]);
+        });
+
+        return () => {
+            socketRef.current.off("chatMessage");
+            socketRef.current.disconnect();
+        };
+    }, [roomCode]);
+
+    // Auto scroll to bottom when new messages arrive
+    useEffect(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, [messages]);
 
     const handleSend = () => {
         if (!input.trim() || !user) return;
@@ -20,9 +46,10 @@ export const ChatBox = ({ width }) => {
             senderUsername: user.username,
             text: input.trim(),
             timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            roomCode
         };
 
-        setMessages((prev) => [...prev, newMessage]);
+        socketRef.current.emit("chatMessage", newMessage);
         setInput("");
     };
 
@@ -56,24 +83,28 @@ export const ChatBox = ({ width }) => {
                     return (
                         <div key={msg.id} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
                             <div
-                                className={`max-w-xs px-4 pt-2 rounded-xl shadow text-sm ${isMe
-                                    ? "bg-blue-500 text-white rounded-br-none"
-                                    : "bg-white text-gray-800 rounded-bl-none"
-                                    }`}
+                                className={`max-w-xs px-4 pt-2 rounded-xl shadow text-sm ${
+                                    isMe
+                                        ? "bg-blue-500 text-white rounded-br-none"
+                                        : "bg-white text-gray-800 rounded-bl-none"
+                                }`}
                             >
                                 <p>{msg.text}</p>
-                                    <p className="text-[11px] text-gray-300">{msg.senderUsername} : {msg.timestamp}</p>
+                                <p className="text-[11px] text-gray-300">
+                                    {msg.senderUsername} : {msg.timestamp}
+                                </p>
                             </div>
                         </div>
                     );
                 })}
+                <div ref={messagesEndRef} />
             </div>
 
             <div className="mt-4 flex items-center gap-1">
                 <input
                     type="text"
                     placeholder="Type a message..."
-                    className="px-2 py-2 rounded-full bg-white text-black focus:outline-none"
+                    className="px-2 py-2 rounded-full bg-white text-black focus:outline-none flex-1"
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && handleSend()}

@@ -9,6 +9,7 @@ export const initSocket = (server) => {
     });
 
     const roomLines = {}; 
+    const roomMessages = {};
 
     io.on("connection", (socket) => {
         console.log(`User connected: ${socket.id}`);
@@ -17,16 +18,22 @@ export const initSocket = (server) => {
             socket.join(roomCode);
             console.log(`User ${socket.id} joined room: ${roomCode}`);
 
-            
+            // Sync drawing state
             if (roomLines[roomCode]) {
-                roomLines[roomCode].forEach(line => {
-                    socket.emit("drawing", line); 
-                });
+                socket.emit("syncDrawing", roomLines[roomCode]);
             } else {
                 roomLines[roomCode] = []; 
             }
+
+            // Sync chat messages
+            if (roomMessages[roomCode]) {
+                socket.emit("syncMessages", roomMessages[roomCode]);
+            } else {
+                roomMessages[roomCode] = [];
+            }
         });
 
+        // Drawing events
         socket.on("startDrawing", (data) => {
             const { roomCode, ...lineData } = data; 
             if (!roomLines[roomCode]) {
@@ -42,13 +49,14 @@ export const initSocket = (server) => {
                 const lastLineIndex = roomLines[roomCode].length - 1;
                 const lastLine = roomLines[roomCode][lastLineIndex];
                 lastLine.points = newPoints;
-                socket.to(roomCode).emit("drawingUpdate", { index: lastLineIndex, newPoints });
+                socket.to(roomCode).emit("drawing", lastLine);
             }
         });
+
         socket.on("stopDrawing", (data) => {
-            const { roomCode } = data; 
+            const { roomCode } = data;
         });
-        // Handle undo event
+
         socket.on("undo", (updatedLines, roomCode) => { 
             roomLines[roomCode] = updatedLines;
             socket.to(roomCode).emit("undo", updatedLines); 
@@ -58,10 +66,20 @@ export const initSocket = (server) => {
             roomLines[roomCode] = updatedLines; 
             socket.to(roomCode).emit("redo", updatedLines); 
         });
-        // Handle clear event
+
         socket.on("clear", (roomCode) => {
             roomLines[roomCode] = []; 
             socket.to(roomCode).emit("clear"); 
+        });
+
+        // Chat events
+        socket.on("chatMessage", (message) => {
+            const { roomCode } = message;
+            if (!roomMessages[roomCode]) {
+                roomMessages[roomCode] = [];
+            }
+            roomMessages[roomCode].push(message);
+            io.to(roomCode).emit("chatMessage", message);
         });
 
         socket.on("disconnect", () => {
