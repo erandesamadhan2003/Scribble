@@ -10,6 +10,7 @@ export const initSocket = (server) => {
 
     const roomLines = {}; 
     const roomMessages = {};
+    const roomUsers = {};
 
     io.on("connection", (socket) => {
         console.log(`User connected: ${socket.id}`);
@@ -55,7 +56,6 @@ export const initSocket = (server) => {
 
         socket.on("stopDrawing", (data) => {
             const { roomCode } = data;
-            // No need to do anything here as the line is already saved
         });
 
         socket.on("undo", (updatedLines, roomCode) => { 
@@ -73,7 +73,6 @@ export const initSocket = (server) => {
             socket.to(roomCode).emit("clear"); 
         });
 
-        // Chat events
         socket.on("chatMessage", (message) => {
             const { roomCode } = message;
             if (!roomMessages[roomCode]) {
@@ -81,6 +80,24 @@ export const initSocket = (server) => {
             }
             roomMessages[roomCode].push(message);
             io.to(roomCode).emit("chatMessage", message);
+        });
+
+
+        //Playerlist Socket connection  
+        socket.on("playerJoined", (username, roomCode) => {
+            if (!roomUsers[roomCode]) roomUsers[roomCode] = [];
+
+            const alreadyExists = roomUsers[roomCode].some(user => user.username === username);
+            if (!alreadyExists) {
+                roomUsers[roomCode].push({
+                    username,
+                    isHost: roomUsers[roomCode].length === 0, // first user is host
+                    score: 0,
+                    avatar: `https://api.dicebear.com/6.x/bottts/svg?seed=${username}`
+                });
+            }
+
+            io.to(roomCode).emit("updatePlayerList", roomUsers[roomCode]);
         });
 
         socket.on("disconnect", () => {

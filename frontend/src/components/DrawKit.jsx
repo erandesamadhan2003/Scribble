@@ -5,7 +5,7 @@ import { useParams } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
 import { io } from "socket.io-client";
 
-const SOCKET_URL = "http://localhost:3000";
+export const SOCKET_URL = "http://localhost:3000";
 export const Drawkit = ({ width }) => {
     const [lines, setLines] = useState([]);
     const [tool, setTool] = useState("pen");

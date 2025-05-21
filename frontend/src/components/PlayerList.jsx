@@ -1,25 +1,42 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
+import { io } from "socket.io-client";
+import { SOCKET_URL } from "./DrawKit";
 
 export const PlayerList = ({ width }) => {
     const [room, setRoom] = useState(null);
+    const [players, setPlayers] = useState([]);
     const { roomCode } = useParams();
+    const socketref = useRef();
 
     useEffect(() => {
-        console.log("RoomCode",roomCode)
-        const fetchroomDetails = async () => {
+        const user = JSON.parse(localStorage.getItem("user"));
+
+        const fetchRoomDetails = async () => {
             try {
                 const response = await fetch(`http://localhost:3000/api/room/getRoom/${roomCode}`);
-
                 const data = await response.json();
                 setRoom(data.room);
             } catch (error) {
                 console.log(error);
-                toast({description:'Failed to fetch room details'});
+                toast({ description: 'Failed to fetch room details' });
             }
-        }
+        };
 
-        fetchroomDetails();
+        fetchRoomDetails();
+
+        socketref.current = io(SOCKET_URL);
+
+        socketref.current.emit("joinRoom", roomCode);
+        socketref.current.emit("playerJoined", user.username, roomCode);
+
+        socketref.current.on("updatePlayerList", (updatedPlayers) => {
+            setPlayers(updatedPlayers);
+        });
+
+        return () => {
+            socketref.current.disconnect();
+        };
     }, [roomCode]);
 
     if (!room) {
@@ -48,13 +65,16 @@ export const PlayerList = ({ width }) => {
                 Room Code: <span className="text-yellow-300">{room.roomCode}</span>
             </h2>
             <h3 className="text-xl font-semibold mb-6">
-                Host: <span className="text-green-200">{room.users.find(user => user.isHost)?.username || "Unknown"}</span>
+                Host:{" "}
+                <span className="text-green-200">
+                    {players.find(p => p.isHost)?.username || "Unknown"}
+                </span>
             </h3>
 
             <div className="space-y-4">
-                {room.users.map((user) => (
+                {players.map((user, index) => (
                     <div
-                        key={user._id}
+                        key={index}
                         className="flex items-center gap-4 bg-white/10 backdrop-blur-md p-4 rounded-xl shadow-md hover:shadow-xl transition-all duration-300"
                     >
                         <img
