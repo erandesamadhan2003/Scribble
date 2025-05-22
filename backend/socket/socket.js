@@ -17,9 +17,8 @@ export const initSocket = (server) => {
         
         socket.on("joinRoom", (roomCode) => { 
             socket.join(roomCode);
-            console.log(`User ${socket.id} joined room: ${roomCode}`);
+            console.log(`User ${socket.id} joined room: ${roomCode}`)
 
-            // Sync drawing state
             if (roomLines[roomCode]) {
                 socket.emit("syncDrawing", roomLines[roomCode]);
             } else {
@@ -34,7 +33,6 @@ export const initSocket = (server) => {
             }
         });
 
-        // Drawing events
         socket.on("startDrawing", (data) => {
             const { roomCode, ...lineData } = data; 
             if (!roomLines[roomCode]) {
@@ -91,7 +89,7 @@ export const initSocket = (server) => {
             if (!alreadyExists) {
                 roomUsers[roomCode].push({
                     username,
-                    isHost: roomUsers[roomCode].length === 0, // first user is host
+                    isHost: roomUsers[roomCode].length === 0,
                     score: 0,
                     avatar: `https://api.dicebear.com/6.x/bottts/svg?seed=${username}`
                 });
