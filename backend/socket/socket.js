@@ -25,7 +25,7 @@ export const initSocket = (server) => {
                 roomLines[roomCode] = []; 
             }
 
-            // Sync chat messages
+           
             if (roomMessages[roomCode]) {
                 socket.emit("syncMessages", roomMessages[roomCode]);
             } else {
