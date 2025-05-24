@@ -20,10 +20,12 @@ export const Drawkit = ({ width }) => {
     const { roomCode } = useParams();
     const containerRef = useRef(null);
     const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
-    const colors = ["#3b82f6", "#ef4444", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899", "#000000", "#6b7280"];
+    const colors = ["#fff","#3b82f6", "#ef4444", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899", "#000000", "#6b7280"];
     const strokeWidths = [1, 3, 5, 8, 12, 14, 18, 24, 28];
-
-
+    const [sketcher, setSketcher] = useState('samadhan');
+    const [user, setUser] = useState();
+    const [lengthOfWord, setLengthOfWord] = useState(3);
+    const [correctWord, setCorrectWord] = useState('')
 
     const handleResize = () => {
         if (containerRef.current) {
@@ -35,6 +37,10 @@ export const Drawkit = ({ width }) => {
     };
     //get room details
     useEffect(() => {
+        const userData = localStorage.getItem("user");
+        if (userData) {
+            setUser(JSON.parse(userData));
+        }
         const fetchroomDetails = async () => {
             try {
                 const response = await fetch(`http://localhost:3000/api/room/getRoom/${roomCode}`);
@@ -60,7 +66,7 @@ export const Drawkit = ({ width }) => {
     useEffect(() => {
         socketRef.current = io(SOCKET_URL);
         socketRef.current.emit("joinRoom", roomCode);
-        
+
         socketRef.current.on("syncDrawing", (initialLines) => {
             setLines(initialLines);
         });
@@ -107,6 +113,7 @@ export const Drawkit = ({ width }) => {
     }, [lines]);
 
     const handleMouseDown = (e) => {
+        if (user.username !== sketcher) return;
         isDrawing.current = true;
         const pos = e.target.getStage().getPointerPosition();
         const newLine = {
@@ -121,6 +128,7 @@ export const Drawkit = ({ width }) => {
     };
 
     const handleMouseMove = (e) => {
+        if (user.username !== sketcher) return;
         if (!isDrawing.current) return;
         const stage = e.target.getStage();
         const point = stage.getPointerPosition();
@@ -128,15 +136,16 @@ export const Drawkit = ({ width }) => {
         lastLine.points = [...lastLine.points, point.x, point.y];
         const updatedLines = [...lines.slice(0, -1), lastLine];
         setLines(updatedLines);
-        socketRef.current.emit("drawing", { 
-            ...lastLine, 
-            roomCode, 
-            isDrawing: true, 
-            newPoints: lastLine.points 
+        socketRef.current.emit("drawing", {
+            ...lastLine,
+            roomCode,
+            isDrawing: true,
+            newPoints: lastLine.points
         });
     };
 
     const handleMouseUp = () => {
+        if (user.username !== sketcher) return;
         isDrawing.current = false;
         if (lines.length > 0 && lines[lines.length - 1].points.length > 2) {
             setHistory([...history, JSON.parse(JSON.stringify(lines))]);
@@ -212,11 +221,11 @@ export const Drawkit = ({ width }) => {
             lastLine.points = [...lastLine.points, pos.x, pos.y];
             const updatedLines = [...lines.slice(0, -1), lastLine];
             setLines(updatedLines);
-            socketRef.current.emit("drawing", { 
-                ...lastLine, 
-                roomCode, 
-                isDrawing: true, 
-                newPoints: lastLine.points 
+            socketRef.current.emit("drawing", {
+                ...lastLine,
+                roomCode,
+                isDrawing: true,
+                newPoints: lastLine.points
             });
         };
 
@@ -245,87 +254,98 @@ export const Drawkit = ({ width }) => {
 
     return (
         <div className="flex flex-col items-center p-4 rounded-lg shadow-md bg-gray-50" style={{ width: `${width}%` }}>
-            <div className="flex flex-col w-full gap-4 mb-4">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                        <button
-                            className={`p-2 rounded ${tool === "pen" ? "bg-blue-500 text-white" : "bg-white text-gray-700 border border-gray-300"}`}
-                            onClick={() => setTool("pen")}
-                            title="Pen Tool"
-                        >
-                            <Palette size={20} />
-                        </button>
-                        <button
-                            className={`p-2 rounded ${tool === "eraser" ? "bg-blue-500 text-white" : "bg-white text-gray-700 border border-gray-300"}`}
-                            onClick={() => setTool("eraser")}
-                            title="Eraser Tool"
-                        >
-                            <Eraser size={20} />
-                        </button>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                        <button
-                            className="p-2 text-gray-700 bg-white border border-gray-300 rounded disabled:opacity-50"
-                            onClick={handleUndo}
-                            disabled={lines.length === 0 && history.length === 0}
-                            title="Undo"
-                        >
-                            <Undo2 size={20} />
-                        </button>
-                        <button
-                            className="p-2 text-gray-700 bg-white border border-gray-300 rounded disabled:opacity-50"
-                            onClick={handleRedo}
-                            disabled={redoStack.length === 0}
-                            title="Redo"
-                        >
-                            <Redo2 size={20} />
-                        </button>
-                        <button
-                            className="p-2 text-gray-700 bg-white border border-gray-300 rounded disabled:opacity-50"
-                            onClick={handleClear}
-                            disabled={lines.length === 0}
-                            title="Clear Canvas"
-                        >
-                            <Trash2 size={20} />
-                        </button>
-                    </div>
-                </div>
-                <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center">
-                    <div className="flex flex-col gap-1">
-                        <label className="text-sm font-medium text-gray-700">Colors</label>
-                        <div className="flex flex-wrap gap-2">
-                            {colors.map((c, i) => (
+            {sketcher !== user?.username ?
+                (<div>
+                    <h1 className="text-2xl mb-3">
+                        {correctWord ? (
+                           <span> You Guess the Correct Word : {correctWord}</span>
+                        ) : (
+                            <span> Guess the {lengthOfWord} letter Word</span>
+                        )}
+                    </h1> 
+                </div>) : (
+                    <div className="flex flex-col w-full gap-4 mb-4">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
                                 <button
-                                    key={i}
-                                    className={`w-8 h-8 rounded-full ${color === c ? 'ring-2 ring-offset-2 ring-blue-500' : ''}`}
-                                    style={{ backgroundColor: c }}
-                                    onClick={() => setColor(c)}
-                                    title={`Select ${c} color`}
-                                />
-                            ))}
-                        </div>
-                    </div>
-                    <div className="flex flex-col gap-1">
-                        <label className="text-sm font-medium text-gray-700">Stroke Width</label>
-                        <div className="flex gap-2">
-                            {strokeWidths.map((width, i) => (
-                                <button
-                                    key={i}
-                                    className={`w-8 h-8 rounded flex items-center justify-center border ${strokeWidth === width ? 'bg-blue-100 border-blue-500' : 'bg-white border-gray-300'}`}
-                                    onClick={() => setStrokeWidth(width)}
-                                    title={`${width}px stroke width`}
+                                    className={`p-2 rounded ${tool === "pen" ? "bg-blue-500 text-white" : "bg-white text-gray-700 border border-gray-300"}`}
+                                    onClick={() => setTool("pen")}
+                                    title="Pen Tool"
                                 >
-                                    <div
-                                        className="bg-black rounded-full"
-                                        style={{ width: width + 4, height: width + 4 }}
-                                    />
+                                    <Palette size={20} />
                                 </button>
-                            ))}
+                                <button
+                                    className={`p-2 rounded ${tool === "eraser" ? "bg-blue-500 text-white" : "bg-white text-gray-700 border border-gray-300"}`}
+                                    onClick={() => setTool("eraser")}
+                                    title="Eraser Tool"
+                                >
+                                    <Eraser size={20} />
+                                </button>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                                <button
+                                    className="p-2 text-gray-700 bg-white border border-gray-300 rounded disabled:opacity-50"
+                                    onClick={handleUndo}
+                                    disabled={lines.length === 0 && history.length === 0}
+                                    title="Undo"
+                                >
+                                    <Undo2 size={20} />
+                                </button>
+                                <button
+                                    className="p-2 text-gray-700 bg-white border border-gray-300 rounded disabled:opacity-50"
+                                    onClick={handleRedo}
+                                    disabled={redoStack.length === 0}
+                                    title="Redo"
+                                >
+                                    <Redo2 size={20} />
+                                </button>
+                                <button
+                                    className="p-2 text-gray-700 bg-white border border-gray-300 rounded disabled:opacity-50"
+                                    onClick={handleClear}
+                                    disabled={lines.length === 0}
+                                    title="Clear Canvas"
+                                >
+                                    <Trash2 size={20} />
+                                </button>
+                            </div>
+                        </div>
+                        <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center">
+                            <div className="flex flex-col gap-1">
+                                <label className="text-sm font-medium text-gray-700">Colors</label>
+                                <div className="flex flex-wrap gap-2">
+                                    {colors.map((c, i) => (
+                                        <button
+                                            key={i}
+                                            className={`w-8 h-8 rounded-full ${color === c ? 'ring-2 ring-offset-2 ring-blue-500' : ''}`}
+                                            style={{ backgroundColor: c }}
+                                            onClick={() => setColor(c)}
+                                            title={`Select ${c} color`}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+                            <div className="flex flex-col gap-1">
+                                <label className="text-sm font-medium text-gray-700">Stroke Width</label>
+                                <div className="flex gap-2">
+                                    {strokeWidths.map((width, i) => (
+                                        <button
+                                            key={i}
+                                            className={`w-8 h-8 rounded flex items-center justify-center border ${strokeWidth === width ? 'bg-blue-100 border-blue-500' : 'bg-white border-gray-300'}`}
+                                            onClick={() => setStrokeWidth(width)}
+                                            title={`${width}px stroke width`}
+                                        >
+                                            <div
+                                                className="bg-black rounded-full"
+                                                style={{ width: width + 4, height: width + 4 }}
+                                            />
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
                         </div>
                     </div>
-                </div>
-            </div>
+                )}
             <div
                 ref={containerRef}
                 className="w-full h-[70%] bg-white rounded-lg shadow-inner border border-gray-200"
