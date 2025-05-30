@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { io } from "socket.io-client";
 import { useParams } from "react-router-dom";
+import { toast } from "@/hooks/use-toast";
 
 const SOCKET_URL = "http://localhost:3000";
 
@@ -11,6 +12,8 @@ export const ChatBox = ({ width }) => {
     const socketRef = useRef(null);
     const { roomCode } = useParams();
     const messagesEndRef = useRef(null);
+    const [correctWord, setCorrectWord] = useState('');
+    const [sketcher, setSketcher] = useState()
 
     useEffect(() => {
         const userData = localStorage.getItem("user");
@@ -26,6 +29,11 @@ export const ChatBox = ({ width }) => {
         socketRef.current.on("chatMessage", (message) => {
             setMessages((prev) => [...prev, message]);
         });
+
+        socketRef.current.on('updateSketcher', ({ sketcher, word }) => {
+            setCorrectWord(word);
+            setSketcher(sketcher);
+        })
 
         return () => {
             socketRef.current.off("chatMessage");
@@ -48,6 +56,23 @@ export const ChatBox = ({ width }) => {
             timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
             roomCode
         };
+
+        if (newMessage.senderUsername == sketcher) {
+            setInput('');
+            return;
+        }
+
+        if (input === correctWord) {
+            toast({ description: 'You Got the correct word' });
+            const username = user.username;
+            socketRef.current.emit("wordGuessCorrected", {
+                correctWord,
+                roomCode,
+                username
+            });
+            setInput("");
+            return;
+        }
 
         socketRef.current.emit("chatMessage", newMessage);
         setInput("");
@@ -83,11 +108,10 @@ export const ChatBox = ({ width }) => {
                     return (
                         <div key={msg.id} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
                             <div
-                                className={`max-w-xs px-4 pt-2 rounded-xl shadow text-sm ${
-                                    isMe
+                                className={`max-w-xs px-4 pt-2 rounded-xl shadow text-sm ${isMe
                                         ? "bg-blue-500 text-white rounded-br-none"
                                         : "bg-white text-gray-800 rounded-bl-none"
-                                }`}
+                                    }`}
                             >
                                 <p>{msg.text}</p>
                                 <p className="text-[11px] text-gray-300">

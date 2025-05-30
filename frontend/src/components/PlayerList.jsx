@@ -25,7 +25,9 @@ export const PlayerList = ({ width }) => {
 
         fetchRoomDetails();
 
-        socketref.current = io(SOCKET_URL);
+        socketref.current = io(SOCKET_URL, {
+            reconnection: false
+        });
 
         socketref.current.emit("joinRoom", roomCode);
         socketref.current.emit("playerJoined", user.username, roomCode);
@@ -35,7 +37,7 @@ export const PlayerList = ({ width }) => {
         });
 
         return () => {
-            socketref.current.disconnect();
+            socketref.current.off('updatePlayerList');
         };
     }, [roomCode, players]);
 

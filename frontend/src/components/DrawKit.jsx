@@ -4,7 +4,7 @@ import { Palette, Eraser, Undo2, Redo2, Trash2 } from "lucide-react";
 import { useParams } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
 import { io } from "socket.io-client";
-
+import wordsData from '@/JSON/word.json'
 export const SOCKET_URL = "http://localhost:3000";
 
 export const Drawkit = ({ width }) => {
@@ -25,20 +25,26 @@ export const Drawkit = ({ width }) => {
     const colors = ["#fff", "#3b82f6", "#ef4444", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899", "#000000", "#6b7280"];
     const strokeWidths = [1, 3, 5, 8, 12, 14, 18, 24, 28];
     const [sketcher, setSketcher] = useState('');
-    const [user, setUser] = useState();
-    const [lengthOfWord, setLengthOfWord] = useState(3);
-    const [correctWord, setCorrectWord] = useState('');
+    const [user, setUser] = useState(null);
+    const [lengthOfWord, setLengthOfWord] = useState(0);
+    const [correctedWord, setCorrectWord] = useState("");
     const [isGameStart, setIsgameStart] = useState(false);
     const [currentTurnIndex, setCurrentTurnIndex] = useState(0);
     const [turnTimeLeft, setTurnTimeLeft] = useState(45);
+    const [wordToDraw, setWordToDraw] = useState('');
+    const [wordsArray, setWordsArray] = useState([]);
 
-    // Move nextTurn to useCallback to avoid stale closures
+    const getRandomWord = useCallback(() => {
+        if (wordsArray.length === 0) return '';
+        const randomIndex = Math.floor(Math.random() * wordsArray.length);
+        return wordsArray[randomIndex];
+    }, [wordsArray]);
+
     const nextTurn = useCallback(() => {
         if (!room?.users?.length) return;
-        
+
         setCurrentTurnIndex(prevIndex => {
             const nextIndex = (prevIndex + 1) % room.users.length;
-            console.log(`Switching turn from index ${prevIndex} to ${nextIndex}`);
             return nextIndex;
         });
     }, [room?.users?.length]);
@@ -65,16 +71,15 @@ export const Drawkit = ({ width }) => {
                 const response = await fetch(`http://localhost:3000/api/room/getRoom/${roomCode}`);
                 const data = await response.json();
                 setRoom(data.room);
-                console.log('Room details fetched:', data.room);
             } catch (error) {
                 console.log(error);
                 toast({ description: 'Failed to fetch room details' });
             }
         };
-
+        setWordsArray(wordsData);
         fetchRoomDetails();
-    }, [roomCode]);
 
+    }, [roomCode]);
     // Handle window resize
     useEffect(() => {
         handleResize();
@@ -84,7 +89,9 @@ export const Drawkit = ({ width }) => {
 
     // Socket initialization
     useEffect(() => {
-        socketRef.current = io(SOCKET_URL);
+        socketRef.current = io(SOCKET_URL, {
+            reconnection: false
+        });
         socketRef.current.emit("joinRoom", roomCode);
 
         // Socket event listeners
@@ -96,15 +103,27 @@ export const Drawkit = ({ width }) => {
             setLines((prevLines) => [...prevLines, data]);
         });
 
-        socketRef.current.on("updateSketcher", (newSketcher) => {
-            console.log('Received sketcher update:', newSketcher);
-            setSketcher(newSketcher);
+        socketRef.current.on('GameStarted', (roomCode) => {
+            setIsgameStart(true);
         });
+
+        socketRef.current.on("updateSketcher", ({ sketcher, word }) => {
+            setWordToDraw(word);
+            setLengthOfWord(word.length);
+            setSketcher(sketcher);
+        });
+
+        socketRef.current.on("CorrectGuess", ({ correctWord, username }) => {
+            if (user?.username == username) {
+                setCorrectWord(correctWord);
+                console.log(correctedWord);
+            }
+        })
 
         socketRef.current.on("undo", (updatedLines) => {
             setLines(updatedLines);
             setHistory((prevHistory) => {
-                const lastStateIndex = prevHistory.findIndex(historyState => 
+                const lastStateIndex = prevHistory.findIndex(historyState =>
                     JSON.stringify(historyState) === JSON.stringify(updatedLines)
                 );
                 if (lastStateIndex !== -1) {
@@ -141,39 +160,45 @@ export const Drawkit = ({ width }) => {
             socketRef.current.off("redo");
             socketRef.current.off("clear");
             socketRef.current.off("turnTimer");
+            socketRef.current.off("CorrectGuess");
             socketRef.current.disconnect();
         };
-    }, [roomCode]);
+    }, [roomCode,user]);
 
     // Game turn management
     useEffect(() => {
-        if (!isGameStart || !room?.users?.length) {
-            console.log('Game not started or no users');
+        if (!isGameStart || !room?.users?.length || wordsArray.length === 0) {
             return;
         }
 
         const currentPlayer = room.users[currentTurnIndex];
         if (!currentPlayer) {
-            console.log('No current player found');
             return;
         }
 
-        console.log(`Setting turn for player: ${currentPlayer.username} (index: ${currentTurnIndex})`);
+        const randomWord = getRandomWord();
         setSketcher(currentPlayer.username);
 
-        // Emit sketcher to server
+        handleClear();
+        setWordToDraw('');
+        setCorrectWord('');
+        setLengthOfWord(0);
+
         socketRef.current?.emit("setSketcher", {
             roomCode,
             sketcher: currentPlayer.username,
-            turnIndex: currentTurnIndex
+            turnIndex: currentTurnIndex,
+            word: randomWord
         });
+
+        socketRef.current?.emit("timeleft", {roomCode, turnTimeLeft})
 
         // Reset turn timer
         setTurnTimeLeft(45);
+        
 
         // Set timer for next turn
         timerRef.current = setTimeout(() => {
-            console.log('45 seconds elapsed, switching to next turn');
             nextTurn();
         }, 45000);
 
@@ -280,8 +305,8 @@ export const Drawkit = ({ width }) => {
     };
 
     const handleStartGame = () => {
-        setIsgameStart(true);
         socketRef.current.emit("startGame", { roomCode });
+        setIsgameStart(true);
     };
 
     // Touch event handlers for mobile
@@ -350,24 +375,22 @@ export const Drawkit = ({ width }) => {
 
     return (
         <div className="flex flex-col justify-between items-center p-4 rounded-lg shadow-md bg-gray-50" style={{ width: `${width}%` }}>
-            {isGameStart && (
-                <div className="w-full mb-4 p-3 bg-blue-100 rounded-lg">
+            <div className="w-full mb-4 p-3 rounded-lg">
+                {isGameStart &&
                     <div className="flex justify-between items-center">
-                        <span className="text-lg font-semibold">
-                            Current Sketcher: <span className="text-blue-600">{sketcher}</span>
-                        </span>
                         <span className="text-lg font-semibold">
                             Time Left: <span className="text-red-600">{turnTimeLeft}s</span>
                         </span>
+                        <span className="text-lg font-semibold">{sketcher} is Drawing</span>
                     </div>
-                </div>
-            )}
+                }
+            </div>
 
             {sketcher !== user?.username ? (
                 <div>
                     <h1 className="text-2xl mb-3">
-                        {correctWord ? (
-                            <span>You Guess the Correct Word: {correctWord}</span>
+                        {correctedWord ? (
+                            <span>You Guessed the Correct Word: {correctedWord}</span>
                         ) : (
                             <span>Guess the {lengthOfWord} letter Word</span>
                         )}
@@ -375,7 +398,6 @@ export const Drawkit = ({ width }) => {
                 </div>
             ) : (
                 <div className="flex flex-col w-full gap-4 mb-4">
-                    <h1 className="text-2xl mb-3 text-green-600">Your turn to draw!</h1>
                     <div className="flex flex-wrap items-center justify-between gap-2">
                         <div className="flex items-center gap-2">
                             <button
@@ -495,14 +517,15 @@ export const Drawkit = ({ width }) => {
             <div className="w-full mt-2 text-sm text-center text-gray-500">
                 {tool === "pen" ? "Drawing with pen" : "Erasing"} | Stroke width: {strokeWidth}px
             </div>
-
-            <div>
-                Word
-            </div>
+            {sketcher === user?.username &&
+                (<div>
+                    Sketch the picture of : {wordToDraw}
+                </div>
+                )}
 
             {!isGameStart && user?.isHost && (
                 <div className="mt-auto self-end">
-                    <button 
+                    <button
                         className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
                         onClick={handleStartGame}
                     >

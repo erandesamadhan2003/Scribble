@@ -13,11 +13,9 @@ export const initSocket = (server) => {
     const roomUsers = {};
 
     io.on("connection", (socket) => {
-        console.log(`User connected: ${socket.id}`);
 
         socket.on("joinRoom", (roomCode) => {
             socket.join(roomCode);
-            console.log(`User ${socket.id} joined room: ${roomCode}`)
 
             if (roomLines[roomCode]) {
                 socket.emit("syncDrawing", roomLines[roomCode]);
@@ -33,6 +31,11 @@ export const initSocket = (server) => {
             }
         });
 
+        socket.on("startGame", (data) => {
+            const { roomCode } = data;
+            socket.to(roomCode).emit('GameStarted', roomCode);
+        })
+
         socket.on("startDrawing", (data) => {
             const { roomCode, ...lineData } = data;
             if (!roomLines[roomCode]) {
@@ -41,10 +44,13 @@ export const initSocket = (server) => {
             roomLines[roomCode].push(lineData);
             socket.to(roomCode).emit("drawing", lineData);
         });
-        socket.on("setSketcher", ({ roomCode, sketcher }) => {
-            console.log(`New sketcher in ${roomCode}: ${sketcher}`);
-            io.to(roomCode).emit("updateSketcher", sketcher);
+        socket.on("setSketcher", ({ roomCode, sketcher, turnIndex, word }) => {
+            io.to(roomCode).emit("updateSketcher", { sketcher, word });
         });
+
+        socket.on("timeleft", ({roomCode, turnTimeLeft}) => {
+            io.to(roomCode).emit("turnTimer", turnTimeLeft);
+        })
 
         socket.on("drawing", (data) => {
             const { roomCode, isDrawing, newPoints } = data;
@@ -75,6 +81,10 @@ export const initSocket = (server) => {
             socket.to(roomCode).emit("clear");
         });
 
+        socket.on("wordGuessCorrected", ({ correctWord, roomCode, username }) => {
+            console.log(correctWord); // This will now show the actual word
+            socket.to(roomCode).emit("CorrectGuess", {correctWord, username});
+        });
         socket.on("chatMessage", (message) => {
             const { roomCode } = message;
             if (!roomMessages[roomCode]) {
@@ -103,7 +113,6 @@ export const initSocket = (server) => {
         });
 
         socket.on("disconnect", () => {
-            console.log(`User disconnected: ${socket.id}`);
         });
     });
 };
