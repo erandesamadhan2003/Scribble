@@ -37,7 +37,7 @@ export const PlayerList = ({ width }) => {
         return () => {
             socketref.current.disconnect();
         };
-    }, [roomCode]);
+    }, [roomCode, players]);
 
     if (!room) {
         return (

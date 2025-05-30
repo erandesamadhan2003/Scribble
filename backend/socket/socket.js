@@ -3,29 +3,29 @@ import { Server } from "socket.io";
 export const initSocket = (server) => {
     const io = new Server(server, {
         cors: {
-            origin: "http://localhost:5173", 
+            origin: "http://localhost:5173",
             methods: ["GET", "POST", "PUT"]
         }
     });
 
-    const roomLines = {}; 
+    const roomLines = {};
     const roomMessages = {};
     const roomUsers = {};
 
     io.on("connection", (socket) => {
         console.log(`User connected: ${socket.id}`);
-        
-        socket.on("joinRoom", (roomCode) => { 
+
+        socket.on("joinRoom", (roomCode) => {
             socket.join(roomCode);
             console.log(`User ${socket.id} joined room: ${roomCode}`)
 
             if (roomLines[roomCode]) {
                 socket.emit("syncDrawing", roomLines[roomCode]);
             } else {
-                roomLines[roomCode] = []; 
+                roomLines[roomCode] = [];
             }
 
-           
+
             if (roomMessages[roomCode]) {
                 socket.emit("syncMessages", roomMessages[roomCode]);
             } else {
@@ -34,16 +34,20 @@ export const initSocket = (server) => {
         });
 
         socket.on("startDrawing", (data) => {
-            const { roomCode, ...lineData } = data; 
+            const { roomCode, ...lineData } = data;
             if (!roomLines[roomCode]) {
                 roomLines[roomCode] = [];
             }
-            roomLines[roomCode].push(lineData); 
-            socket.to(roomCode).emit("drawing", lineData); 
+            roomLines[roomCode].push(lineData);
+            socket.to(roomCode).emit("drawing", lineData);
         });
-        
+        socket.on("setSketcher", ({ roomCode, sketcher }) => {
+            console.log(`New sketcher in ${roomCode}: ${sketcher}`);
+            io.to(roomCode).emit("updateSketcher", sketcher);
+        });
+
         socket.on("drawing", (data) => {
-            const { roomCode, isDrawing, newPoints } = data; 
+            const { roomCode, isDrawing, newPoints } = data;
             if (isDrawing && roomLines[roomCode] && roomLines[roomCode].length > 0) {
                 const lastLineIndex = roomLines[roomCode].length - 1;
                 const lastLine = roomLines[roomCode][lastLineIndex];
@@ -56,19 +60,19 @@ export const initSocket = (server) => {
             const { roomCode } = data;
         });
 
-        socket.on("undo", (updatedLines, roomCode) => { 
+        socket.on("undo", (updatedLines, roomCode) => {
             roomLines[roomCode] = updatedLines;
-            socket.to(roomCode).emit("undo", updatedLines); 
+            socket.to(roomCode).emit("undo", updatedLines);
         });
-        
-        socket.on("redo", (updatedLines, roomCode) => { 
-            roomLines[roomCode] = updatedLines; 
-            socket.to(roomCode).emit("redo", updatedLines); 
+
+        socket.on("redo", (updatedLines, roomCode) => {
+            roomLines[roomCode] = updatedLines;
+            socket.to(roomCode).emit("redo", updatedLines);
         });
 
         socket.on("clear", (roomCode) => {
-            roomLines[roomCode] = []; 
-            socket.to(roomCode).emit("clear"); 
+            roomLines[roomCode] = [];
+            socket.to(roomCode).emit("clear");
         });
 
         socket.on("chatMessage", (message) => {
