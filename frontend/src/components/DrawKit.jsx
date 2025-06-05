@@ -113,9 +113,13 @@ export const Drawkit = ({ width }) => {
             setSketcher(sketcher);
         });
 
+        const handleIncreaseScore = (user) => {
+            socketRef.current.emit("increaseScore", { roomCode, user, timerRef });
+        }
         socketRef.current.on("CorrectGuess", ({ correctWord, username }) => {
             if (user?.username == username) {
                 setCorrectWord(correctWord);
+                handleIncreaseScore(user);
                 console.log(correctedWord);
             }
         })

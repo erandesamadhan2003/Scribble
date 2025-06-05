@@ -29,6 +29,29 @@ export const PlayerList = ({ width }) => {
             reconnection: false
         });
 
+        const handleUpdateScore = async (user, score) => {
+            try {
+                const response = await fetch(`http://localhost:3000/api/room/update/${user._id}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ score }),
+                });
+                const data = await response.json();
+                if (data.success) {
+                    fetchRoomDetails(); // Refresh room details to get updated scores
+                    socketref.current.emit("updatePlayerList", players);
+                }
+            } catch (error) {
+                console.error("Error updating score:", error);
+            }
+        }
+
+        socketref.current.on("scoreUpdated", ({ userI, score, timeref }) => {
+            handleUpdateScore(userI, score);
+        });
+
         socketref.current.emit("joinRoom", roomCode);
         socketref.current.emit("playerJoined", user.username, roomCode);
 

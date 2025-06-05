@@ -62,6 +62,20 @@ export const initSocket = (server) => {
             }
         });
 
+        socket.on("increaseScore", ({ roomCode, user, timeref }) => {
+            if (!roomUsers[roomCode]) {
+                roomUsers[roomCode] = [];
+            }
+
+            const userI = roomUsers[roomCode].find(u => u.username === user.username);
+            if (userI) {
+                userI.score += timeref* 4; 
+                io.to(roomCode).emit("updatePlayerList", roomUsers[roomCode]);
+                io.to(roomCode).emit("scoreUpdated", { userI, score: user.score, timeref });
+            }
+        });
+
+
         socket.on("stopDrawing", (data) => {
             const { roomCode } = data;
         });
